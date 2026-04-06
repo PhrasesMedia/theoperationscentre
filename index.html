@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operations Centre</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --neon-blue:#00b8ff; --neon-green:#00ffaa;
+  --neon-amber:#ffb300; --neon-red:#ff3355;
+  --text-hi:#c8e8ff; --text-mid:#4a7a9a; --text-dim:#1e3a52;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100vh;overflow:hidden;background:#040810;font-family:'Rajdhani',sans-serif;}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.07) 3px,rgba(0,0,0,0.07) 4px);pointer-events:none;z-index:9998;}
+
+/* ━━ TOPBAR ━━ */
+.topbar{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;align-items:center;justify-content:space-between;padding:5px 20px;background:rgba(2,5,12,0.97);border-bottom:1px solid #0a1e34;}
+.tb-title{font-family:'Orbitron';font-size:11px;font-weight:900;letter-spacing:5px;color:var(--neon-blue);text-shadow:0 0 14px rgba(0,184,255,0.5);}
+.tb-right{display:flex;gap:14px;align-items:center;font-family:'Share Tech Mono';font-size:9px;color:var(--text-mid);}
+.tb-pill{display:flex;align-items:center;gap:5px;padding:2px 8px;border-radius:20px;border:1px solid rgba(0,255,170,0.25);color:var(--neon-green);font-size:8px;}
+.tb-dot{width:5px;height:5px;border-radius:50%;background:var(--neon-green);box-shadow:0 0 5px var(--neon-green);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+#clock{font-family:'Orbitron';font-size:13px;color:var(--neon-blue);letter-spacing:3px;text-shadow:0 0 8px rgba(0,184,255,0.4);}
+
+/* ━━ STAGE ━━ */
+#stage{
+  position:fixed;top:28px;left:0;right:0;bottom:26px;
+  overflow:hidden;
+  background:
+    radial-gradient(ellipse 60% 25% at 50% 0%,rgba(0,50,140,0.14) 0%,transparent 100%),
+    linear-gradient(180deg,
+      #050a14 0%,
+      #060c18 43%,
+      #182030 44%,
+      #1c2028 45%,
+      #191d25 68%,
+      #1c2030 100%
+    );
+}
+/* Wall-desk join line */
+#stage::before{content:'';position:absolute;top:44%;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,#252e3e 10%,#2a3448 50%,#252e3e 90%,transparent);pointer-events:none;}
+
+/* ━━ DRAG ITEMS ━━ */
+.drag-item{
+  position:absolute;
+  user-select:none;
+  z-index:10;
+  filter:drop-shadow(0 8px 24px rgba(0,0,0,0.7));
+  transition:filter .15s;
+}
+.drag-item.active{z-index:500;filter:drop-shadow(0 12px 32px rgba(0,100,255,0.2)) drop-shadow(0 8px 24px rgba(0,0,0,0.8));}
+
+/* Drag handle bar */
+.drag-handle{
+  display:flex;align-items:center;gap:6px;
+  padding:4px 8px 4px 6px;
+  background:linear-gradient(90deg,#060e1c,#0a1428,#060e1c);
+  border:1px solid rgba(0,100,200,0.3);
+  border-bottom:1px solid rgba(0,100,200,0.15);
+  border-radius:4px 4px 0 0;
+  cursor:grab;font-family:'Share Tech Mono';font-size:7px;
+  color:var(--text-mid);letter-spacing:1.5px;text-transform:uppercase;
+}
+.drag-handle:active{cursor:grabbing;}
+.drag-handle .grip{
+  display:grid;grid-template-columns:repeat(2,4px);gap:2px;
+  padding-right:4px;flex-shrink:0;
+}
+.drag-handle .grip span{width:3px;height:3px;border-radius:50%;background:rgba(0,150,255,0.35);}
+.drag-handle .dh-label{flex:1;}
+.drag-handle .dh-hint{font-size:6px;color:rgba(0,150,255,0.25);letter-spacing:0;}
+
+/* ━━ WALL DISPLAY ━━ */
+.wall-monitor{
+  background:#010408;
+  border:2px solid rgba(0,100,200,0.35);
+  border-top:none;
+  border-radius:0 0 4px 4px;
+  box-shadow:0 0 0 1px #060e18,0 0 40px rgba(0,80,200,0.15),inset 0 0 30px rgba(0,0,0,0.6);
+  overflow:hidden;
+  position:relative;
+  /* resizable vertically */
+  resize:vertical;
+  min-height:140px;
+  max-height:60vh;
+  display:flex;flex-direction:column;
+}
+.wall-monitor::after{content:'';position:absolute;top:0;left:0;right:0;height:30%;background:linear-gradient(180deg,rgba(0,70,200,0.05),transparent);pointer-events:none;z-index:3;}
+.wall-monitor::-webkit-resizer{background:linear-gradient(135deg,transparent 55%,rgba(0,184,255,0.4) 55%);}
+
+.wd-hdr{display:flex;align-items:center;justify-content:space-between;padding:4px 12px;flex-shrink:0;background:linear-gradient(90deg,#010c20,#02142e,#010c20);border-bottom:1px solid rgba(0,100,220,0.18);}
+.wd-title{font-family:'Orbitron';font-size:9px;font-weight:700;letter-spacing:4px;color:var(--neon-blue);text-shadow:0 0 10px rgba(0,200,255,0.5);}
+.wd-stats{display:flex;gap:12px;font-size:9px;font-family:'Share Tech Mono';}
+.wst{color:var(--text-mid);}
+.wst span{color:var(--neon-blue);}
+.wst.r span{color:var(--neon-red);animation:blink 1s infinite;}
+.wst.a span{color:var(--neon-amber);}
+.wst.g span{color:var(--neon-green);}
+@keyframes blink{0%,49%{opacity:1}50%,100%{opacity:.2}}
+
+.wd-body{display:grid;grid-template-columns:210px 1fr 185px;flex:1;min-height:0;overflow:hidden;}
+.wd-body>*+*{border-left:1px solid rgba(0,70,160,0.18);}
+
+.wdl{display:flex;flex-direction:column;padding:6px 8px;gap:4px;overflow:hidden;}
+.wdlbl{font-size:6px;letter-spacing:3px;color:var(--text-dim);font-family:'Share Tech Mono';}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:3px;}
+.si{padding:3px 5px;background:rgba(0,12,35,0.5);border:1px solid rgba(0,45,100,0.22);border-radius:2px;}
+.sin{font-size:7px;color:var(--text-mid);}
+.sbg{font-size:6px;font-weight:700;letter-spacing:1px;padding:1px 3px;border-radius:1px;margin-top:1px;width:fit-content;}
+.bok{background:rgba(0,255,170,0.08);color:var(--neon-green);}
+.bft{background:rgba(255,51,85,0.14);color:var(--neon-red);animation:blink 1s infinite;}
+.bwn{background:rgba(255,179,0,0.1);color:var(--neon-amber);}
+.il{display:flex;flex-direction:column;gap:2px;}
+.irow{display:flex;align-items:center;gap:4px;padding:2px 5px;background:rgba(0,6,20,0.6);border-radius:2px;border-left:2px solid transparent;font-size:6px;}
+.irow.cr{border-color:var(--neon-red);}
+.irow.wn{border-color:var(--neon-amber);}
+.iid{color:var(--neon-blue);font-family:'Share Tech Mono';white-space:nowrap;}
+.idesc{color:var(--text-hi);flex:1;}
+.ibg{font-size:5px;padding:1px 3px;border-radius:1px;font-weight:bold;}
+.ibcr{background:rgba(255,51,85,0.2);color:var(--neon-red);animation:blink 1s infinite;}
+.ibwn{background:rgba(255,179,0,0.18);color:var(--neon-amber);}
+
+.wdc{display:flex;flex-direction:column;}
+.wdch{display:flex;align-items:center;justify-content:space-between;padding:4px 9px;flex-shrink:0;border-bottom:1px solid rgba(0,70,160,0.14);}
+.wdct{font-size:7px;letter-spacing:2px;color:var(--text-mid);font-family:'Share Tech Mono';}
+.wdcc{font-size:8px;color:var(--neon-blue);font-family:'Share Tech Mono';}
+.gwrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+canvas#globe{display:block;}
+
+.wdr{display:flex;flex-direction:column;padding:6px 7px;gap:3px;overflow:hidden;}
+.arlist{display:flex;flex-direction:column;gap:2px;}
+.ar{padding:3px 5px;border-radius:2px;border-left:2px solid var(--text-dim);background:rgba(0,8,25,0.5);}
+.ar.cr{border-color:var(--neon-red);background:rgba(255,51,85,0.04);}
+.ar.wn{border-color:var(--neon-amber);}
+.ar.ok{border-color:var(--neon-green);}
+.ar.in{border-color:var(--neon-blue);}
+.art{display:flex;align-items:center;gap:4px;}
+.arsev{font-size:5px;font-weight:700;padding:1px 3px;border-radius:1px;}
+.scr{background:rgba(255,51,85,0.2);color:var(--neon-red);animation:blink 1.2s infinite;}
+.swn{background:rgba(255,179,0,0.18);color:var(--neon-amber);}
+.sok{background:rgba(0,255,170,0.1);color:var(--neon-green);}
+.sin2{background:rgba(0,184,255,0.1);color:var(--neon-blue);}
+.arn{color:var(--text-hi);font-size:7px;}
+.ard{color:var(--text-mid);font-size:6px;font-family:'Share Tech Mono';}
+.art2{color:var(--text-dim);font-size:6px;font-family:'Share Tech Mono';}
+
+/* Ticker */
+.ticker{display:flex;align-items:center;gap:8px;padding:3px 10px;background:rgba(0,8,22,0.95);border:1px solid rgba(0,70,160,0.2);border-top:none;flex-shrink:0;overflow:hidden;}
+.tlbl{font-size:7px;color:var(--neon-amber);letter-spacing:2px;white-space:nowrap;flex-shrink:0;}
+.tscr{flex:1;overflow:hidden;}
+.tinn{display:inline-flex;gap:24px;animation:tick 30s linear infinite;white-space:nowrap;}
+@keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.ti{font-size:7px;color:var(--text-mid);font-family:'Share Tech Mono';}
+.ti.r{color:var(--neon-red);}.ti.a{color:var(--neon-amber);}.ti.g{color:var(--neon-green);}
+
+/* ━━ MONITOR BEZEL ━━ */
+.mon-bezel{
+  background:linear-gradient(160deg,#1a1e24,#0f1318,#1a1e24);
+  border:2px solid #242a32;border-top:none;
+  border-radius:0 0 4px 4px;
+  padding:0 5px 10px;
+  box-shadow:0 0 0 1px #0a0d12,0 8px 30px rgba(0,0,0,0.9),inset 0 1px 0 rgba(255,255,255,0.04);
+  position:relative;
+  resize:both;overflow:hidden;
+  width:260px;min-width:160px;min-height:160px;
+  display:flex;flex-direction:column;
+}
+.mon-bezel::-webkit-resizer{background:linear-gradient(135deg,transparent 55%,rgba(0,184,255,0.4) 55%);}
+/* ━━ MONITOR STAND ━━ */
+.mon-stand { display:flex; flex-direction:column; align-items:center; }
+
+.mon-neck {
+  width:18px; height:34px;
+  background:linear-gradient(90deg, #12161e, #22283a, #2a3040, #22283a, #12161e);
+  border-left:1px solid #0c1018;
+  border-right:1px solid #38404e;
+  position:relative;
+  margin:0 auto;
+}
+/* Collar where neck meets base */
+.mon-neck::after {
+  content:'';
+  position:absolute; bottom:0; left:-5px; right:-5px;
+  height:7px;
+  background:linear-gradient(180deg, #262e3e, #1c2230);
+  border:1px solid #2a3040; border-bottom:none;
+  border-radius:3px 3px 0 0;
+}
+
+.mon-base {
+  width:110px; height:11px;
+  background:linear-gradient(180deg, #2a3040 0%, #1e2430 50%, #181e2a 100%);
+  border-radius:4px 4px 2px 2px;
+  border:1px solid #323c50;
+  box-shadow:
+    0 5px 14px rgba(0,0,0,0.75),
+    0 2px 4px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+  position:relative; margin:0 auto;
+}
+/* Base shadow on desk */
+.mon-base::after {
+  content:'';
+  position:absolute; bottom:-5px; left:8%; right:8%;
+  height:5px;
+  background:rgba(0,0,0,0.35);
+  border-radius:0 0 50% 50%;
+  filter:blur(4px);
+}
+
+/* ━━ DESK SURFACE ━━ */
+#desk-surface {
+  position:absolute; bottom:0; left:0; right:0;
+  height:82px;
+  z-index:8; /* sits in front of monitor bases/necks, giving depth */
+  pointer-events:none;
+}
+/* Desk top — the flat working surface */
+.desk-top {
+  position:absolute; top:0; left:0; right:0; height:54px;
+  background:linear-gradient(180deg,
+    #202630 0%, #1c2028 30%, #191d25 70%, #161a22 100%);
+  border-top:3px solid #303a4e;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 -12px 40px rgba(0,40,160,0.09);
+}
+/* Subtle screen-glow reflection on desk top */
+.desk-top::before {
+  content:'';
+  position:absolute; top:0; left:10%; right:10%; height:100%;
+  background:radial-gradient(ellipse 70% 60% at 50% 0%,rgba(0,80,200,0.07),transparent);
+}
+/* Cable management strip running along back of desk */
+.desk-top::after {
+  content:'';
+  position:absolute; top:6px; left:3%; right:3%; height:5px;
+  background:repeating-linear-gradient(90deg,#1a1e2a,#1a1e2a 10px,#141820 10px,#141820 14px);
+  border-radius:2px; opacity:0.6;
+}
+/* Desk front panel / fascia */
+.desk-front {
+  position:absolute; bottom:0; left:0; right:0; height:28px;
+  background:linear-gradient(180deg, #141820, #0e1218);
+  border-top:1px solid #242c3a;
+}
+/* Front edge bevel */
+.desk-front::before {
+  content:'';
+  position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg,transparent,rgba(60,80,120,0.3) 15%,rgba(60,80,120,0.3) 85%,transparent);
+}
+/* Recessed strip along front panel */
+.desk-front::after {
+  content:'';
+  position:absolute; top:10px; left:6%; right:6%; height:3px;
+  background:rgba(0,0,0,0.4); border-radius:1px;
+  box-shadow:0 1px 0 rgba(255,255,255,0.03);
+}
+
+/* Monitor URL bar */
+.mon-urlbar{display:flex;align-items:center;gap:4px;padding:4px 6px 5px;background:linear-gradient(180deg,#0e141e,#0a1018);border-bottom:1px solid #1a2535;flex-shrink:0;}
+.mon-urlbar-label{font-family:'Orbitron';font-size:6px;letter-spacing:1px;color:var(--text-dim);white-space:nowrap;}
+.mon-urlbar-input{flex:1;background:#06090f;border:1px solid #1a2535;border-radius:3px;padding:3px 7px;font-size:9px;color:var(--neon-blue);font-family:'Share Tech Mono';outline:none;transition:border-color .2s;}
+.mon-urlbar-input:focus{border-color:rgba(0,184,255,0.5);box-shadow:0 0 0 2px rgba(0,184,255,0.08);color:#fff;}
+.mon-urlbar-input::placeholder{color:var(--text-dim);}
+.mon-urlbar-go{background:rgba(0,184,255,0.12);border:1px solid rgba(0,184,255,0.3);border-radius:3px;padding:3px 8px;font-size:8px;font-weight:600;color:var(--neon-blue);cursor:pointer;white-space:nowrap;font-family:'Share Tech Mono';transition:all .15s;}
+.mon-urlbar-go:hover{background:rgba(0,184,255,0.22);box-shadow:0 0 8px rgba(0,184,255,0.2);}
+
+.mon-screen{background:#010509;border-radius:2px;overflow:hidden;position:relative;flex:1;}
+.mon-screen::before{content:'';position:absolute;top:0;left:0;right:0;height:30%;background:linear-gradient(180deg,rgba(0,60,180,0.04),transparent);pointer-events:none;z-index:5;}
+
+.mon-iframe-wrap{flex:1;position:relative;overflow:hidden;background:#030608;min-height:80px;}
+.mon-iframe{width:100%;height:100%;border:none;display:block;background:#fff;}
+.mon-blocked{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:#030608;font-family:'Share Tech Mono';text-align:center;padding:12px;}
+.mon-blocked.visible{display:flex;}
+.mon-blocked-icon{font-size:20px;color:var(--text-dim);}
+.mon-blocked-msg{font-size:8px;color:var(--text-mid);line-height:1.6;}
+.mon-blocked-hint{font-size:7px;color:var(--text-dim);}
+
+/* PC title bar */
+.pc-titlebar{display:flex;align-items:center;gap:4px;padding:2px 6px;background:linear-gradient(90deg,#030c1c,#050f24,#030c1c);border-bottom:1px solid rgba(0,60,130,0.22);flex-shrink:0;}
+.pc-winbtn{width:4px;height:4px;border-radius:50%;}
+.pwb-red{background:#cc3333;}.pwb-yel{background:#ccaa00;}.pwb-grn{background:#1a8a2a;}
+.pc-tbname{font-family:'Orbitron';font-size:6px;letter-spacing:2px;color:var(--text-mid);flex:1;text-align:center;}
+
+/* ━━ CISCO PHONE ━━ */
+.cisco-phone{display:flex;gap:0;background:linear-gradient(160deg,#282c32,#1e2228,#222630);border:1.5px solid #32383e;border-top:none;border-radius:0 0 5px 5px;width:162px;box-shadow:0 10px 28px rgba(0,0,0,0.85),0 3px 6px rgba(0,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.05),inset 0 0 30px rgba(0,0,0,0.3);position:relative;padding:7px 7px 8px 6px;}
+.cisco-phone::before{content:'';position:absolute;left:-3px;top:30px;width:4px;height:24px;background:linear-gradient(180deg,#2a2e34,#1e2228,#2a2e34);border-radius:2px 0 0 2px;border:1px solid #3a3e44;border-right:none;box-shadow:-2px 0 4px rgba(0,0,0,0.5);}
+.ph-cradle{width:24px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding-top:4px;}
+.ph-recv-top{width:18px;height:28px;background:linear-gradient(160deg,#3a3e46,#2a2e34,#222830);border:1px solid #3e4450;border-radius:8px 8px 4px 4px;box-shadow:2px 0 6px rgba(0,0,0,0.4),inset 1px 0 0 rgba(255,255,255,0.05);position:relative;}
+.ph-recv-top::after{content:'';position:absolute;top:6px;left:50%;transform:translateX(-50%);width:8px;height:8px;border-radius:50%;background:radial-gradient(#111,#0a0a0a);border:1px solid #1a1a1a;box-shadow:0 0 0 2px #222;}
+.ph-recv-stem{width:10px;flex:1;background:linear-gradient(90deg,#2a2e36,#222830);border-left:1px solid #3e4450;border-right:1px solid #1a1e24;margin:0 4px;min-height:60px;}
+.ph-cord{width:14px;height:20px;border-left:2px solid #1a1e24;border-bottom:2px solid #1a1e24;border-radius:0 0 0 4px;margin-left:2px;position:relative;}
+.ph-cord::after{content:'';position:absolute;bottom:-4px;left:-4px;width:6px;height:6px;border-radius:50%;background:#1a1e24;}
+.ph-recv-bot{width:18px;height:22px;background:linear-gradient(160deg,#3a3e46,#2a2e34,#222830);border:1px solid #3e4450;border-radius:4px 4px 8px 8px;box-shadow:2px 0 6px rgba(0,0,0,0.4);position:relative;}
+.ph-recv-bot::after{content:'';position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:8px;height:8px;border-radius:50%;background:radial-gradient(#111,#0a0a0a);border:1px solid #1a1a1a;box-shadow:0 0 0 2px #222;}
+.ph-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;padding-left:5px;}
+.ph-brand-strip{display:flex;align-items:center;justify-content:space-between;padding-bottom:3px;}
+.ph-brand-name{font-family:'Orbitron';font-size:7px;font-weight:700;color:#2a6090;letter-spacing:2px;}
+.ph-model{font-size:5px;color:#2a3a4a;letter-spacing:1px;font-family:'Share Tech Mono';}
+.ph-top{display:flex;gap:4px;align-items:flex-start;}
+.ph-screen{flex:1;background:#0d1a0d;border:1.5px solid #1a2e1a;border-radius:2px;padding:4px 5px;box-shadow:inset 0 0 8px rgba(0,0,0,0.6);}
+.ph-screen-time{font-family:'Share Tech Mono';font-size:12px;color:#44cc44;text-shadow:0 0 6px rgba(60,200,60,0.4);letter-spacing:1px;}
+.ph-screen-line{font-size:6px;color:#1c6a1c;margin-top:1px;}
+.ph-screen-ext{font-size:6px;color:#155515;}
+.ph-lines{display:flex;flex-direction:column;gap:3px;padding-top:2px;}
+.ph-line-btn{display:flex;align-items:center;gap:2px;}
+.ph-line-led{width:5px;height:5px;border-radius:50%;background:#111;border:1px solid #1e1e1e;flex-shrink:0;}
+.ph-line-led.on-r{background:var(--neon-red);box-shadow:0 0 5px rgba(255,51,85,0.7);animation:blink 1.4s infinite;}
+.ph-line-led.on-g{background:var(--neon-green);box-shadow:0 0 5px rgba(0,255,170,0.5);}
+.ph-line-led.on-a{background:var(--neon-amber);box-shadow:0 0 5px rgba(255,179,0,0.5);animation:blink 2s infinite;}
+.ph-line-lbl{font-size:5px;color:#2a2a2a;font-family:'Share Tech Mono';}
+.ph-softkeys{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;}
+.ph-sk{height:10px;background:linear-gradient(180deg,#2a2e36,#222630);border:1px solid #3a3e48;border-radius:2px;font-size:5px;color:#3a4050;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.1s;}
+.ph-sk:hover{color:#7a8090;background:#2e3240;}
+.ph-nav-row{display:flex;gap:5px;align-items:center;}
+.ph-nav{width:36px;height:36px;flex-shrink:0;position:relative;}
+.ph-nav-ring{width:36px;height:36px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#3a3e48,#22262e);border:1px solid #404858;box-shadow:0 2px 6px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.06);position:relative;display:flex;align-items:center;justify-content:center;}
+.ph-nav-center{width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#3a3e48,#1e2228);border:1px solid #404858;box-shadow:0 1px 3px rgba(0,0,0,0.5);position:absolute;display:flex;align-items:center;justify-content:center;font-size:6px;color:#3a4050;cursor:pointer;}
+.ph-nav-arrow{position:absolute;font-size:7px;color:#3a4050;cursor:pointer;width:10px;height:10px;display:flex;align-items:center;justify-content:center;}
+.ph-nav-arrow:hover{color:#8090aa;}
+.ph-nav-up{top:1px;left:50%;transform:translateX(-50%);}
+.ph-nav-down{bottom:1px;left:50%;transform:translateX(-50%);}
+.ph-nav-left{left:1px;top:50%;transform:translateY(-50%);}
+.ph-nav-right{right:1px;top:50%;transform:translateY(-50%);}
+.ph-func{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:2px;}
+.ph-fb{height:12px;background:linear-gradient(180deg,#262a32,#1e2228);border:1px solid #34383e;border-radius:2px;font-size:5px;color:#323840;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.1s;}
+.ph-fb:hover{color:#6a7080;}
+.ph-fb.green-btn{border-color:#1a3020;color:#1a5028;}
+.ph-fb.green-btn:hover{color:#2a8040;}
+.ph-fb.red-btn{border-color:#301a1a;color:#502020;}
+.ph-fb.red-btn:hover{color:#aa3030;}
+.ph-dialpad{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;}
+.ph-dk{height:13px;background:linear-gradient(180deg,#2a2e36,#222630);border:1px solid #383c46;border-radius:2px;font-size:9px;color:#505868;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:'Share Tech Mono';transition:.1s;}
+.ph-dk:hover{background:#2e3240;color:#9aabb8;}
+.ph-base{width:100px;height:5px;background:linear-gradient(180deg,#282c32,#1a1e24);border-radius:0 0 4px 4px;margin:0 auto;border:1px solid #2e3238;border-top:none;box-shadow:0 4px 10px rgba(0,0,0,0.7);}
+
+/* ━━ FOOTER ━━ */
+.footer{position:fixed;bottom:0;left:0;right:0;z-index:1000;display:flex;align-items:center;justify-content:space-between;padding:3px 20px;background:rgba(2,5,12,0.97);border-top:1px solid #0a1e34;font-size:7px;color:var(--text-dim);font-family:'Share Tech Mono';letter-spacing:1px;}
+.footer span{color:var(--neon-green);}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="tb-title">⬡ OPERATIONS CENTRE</div>
+  <div class="tb-right">
+    <div class="tb-pill"><div class="tb-dot"></div>SYSTEMS NOMINAL</div>
+    <span>SHIFT: AFTERNOON</span>
+    <span>|</span>
+    <span>BRISBANE HQ</span>
+    <span>|</span>
+    <span id="clock">00:00:00</span>
+  </div>
+</div>
+
+<!-- STAGE: everything floats here -->
+<div id="stage">
+
+  <!-- ══ WALL DISPLAY ══ -->
+  <div class="drag-item" id="wall-item">
+    <div class="drag-handle">
+      <div class="grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <span class="dh-label">WALL DISPLAY — MCR ALARM CONSOLE</span>
+      <span class="dh-hint">drag · resize bottom edge</span>
+    </div>
+    <div class="wall-monitor">
+      <div class="wd-hdr">
+        <div class="wd-title">MASTER CONTROL ROOM — ALARM DISPLAY</div>
+        <div class="wd-stats">
+          <div class="wst r">CRITICAL <span>2</span></div>
+          <div class="wst a">WARNING <span>5</span></div>
+          <div class="wst g">NOMINAL <span>18</span></div>
+          <div class="wst">UPTIME <span>14d 06h</span></div>
+        </div>
+      </div>
+      <div class="wd-body">
+        <div class="wdl">
+          <div class="wdlbl">Systems Overview</div>
+          <div class="sg">
+            <div class="si"><div class="sin">COMMS</div><div class="sbg bok">NOMINAL</div></div>
+            <div class="si"><div class="sin">DVB / NAV</div><div class="sbg bok">NOMINAL</div></div>
+            <div class="si"><div class="sin">TX — FM</div><div class="sbg bft">FAULT</div></div>
+            <div class="si"><div class="sin">STREAMING</div><div class="sbg bok">NOMINAL</div></div>
+            <div class="si"><div class="sin">DAB+</div><div class="sbg bok">NOMINAL</div></div>
+            <div class="si"><div class="sin">UPLINK</div><div class="sbg bft">FAULT</div></div>
+            <div class="si"><div class="sin">BACKUP</div><div class="sbg bok">ACTIVE</div></div>
+            <div class="si"><div class="sin">COOLING</div><div class="sbg bwn">28°C</div></div>
+          </div>
+          <div class="wdlbl" style="margin-top:3px;">Active Incidents</div>
+          <div class="il">
+            <div class="irow cr"><div class="iid">INC-4841</div><div class="idesc">TX-01 carrier loss — 95.3FM</div><div class="ibg ibcr">CRIT</div></div>
+            <div class="irow cr"><div class="iid">INC-4839</div><div class="idesc">Coot-tha uplink down</div><div class="ibg ibcr">CRIT</div></div>
+            <div class="irow wn"><div class="iid">INC-4836</div><div class="idesc">Studio B audio level low</div><div class="ibg ibwn">WARN</div></div>
+            <div class="irow wn"><div class="iid">INC-4830</div><div class="idesc">MCR Bay C cooling 28°C</div><div class="ibg ibwn">WARN</div></div>
+          </div>
+        </div>
+        <div class="wdc">
+          <div class="wdch">
+            <div class="wdct">TRANSMISSION NETWORK — LIVE</div>
+            <div class="wdcc">BNE · −27.47° 153.02°</div>
+          </div>
+          <div class="gwrap"><canvas id="globe"></canvas></div>
+        </div>
+        <div class="wdr">
+          <div class="wdlbl">Alarm Feed</div>
+          <div class="arlist">
+            <div class="ar cr"><div class="art"><div class="arsev scr">CRIT</div><div class="arn">TX-01 CARRIER LOSS</div></div><div class="ard">95.3 FM · Transmitter 1</div><div class="art2">09:14:32 · 8m ago</div></div>
+            <div class="ar cr"><div class="art"><div class="arsev scr">CRIT</div><div class="arn">LINK DOWN SITE-3</div></div><div class="ard">Mt Coot-tha uplink</div><div class="art2">09:18:45 · 3m ago</div></div>
+            <div class="ar wn"><div class="art"><div class="arsev swn">WARN</div><div class="arn">AUDIO LEVEL LOW</div></div><div class="ard">Studio B · −22 dBFS</div><div class="art2">09:20:11 · 2m ago</div></div>
+            <div class="ar wn"><div class="art"><div class="arsev swn">WARN</div><div class="arn">COOLING THRESHOLD</div></div><div class="ard">MCR Bay C · 28°C</div><div class="art2">09:05:00 · 17m ago</div></div>
+            <div class="ar ok"><div class="art"><div class="arsev sok">RESV</div><div class="arn">DVN FEED 2 RESTORED</div></div><div class="ard">Backup path nominal</div><div class="art2">09:10:44 · 11m ago</div></div>
+            <div class="ar in"><div class="art"><div class="arsev sin2">INFO</div><div class="arn">SCHED. MAINTENANCE</div></div><div class="ard">Encoder reboot · 22:00</div><div class="art2">Acknowledged</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="ticker">
+      <div class="tlbl">LIVE ▶</div>
+      <div class="tscr"><div class="tinn">
+        <span class="ti r">● CRIT — TX-01 CARRIER LOSS 95.3FM</span><span class="ti a">● WARN — AUDIO LOW STUDIO B</span>
+        <span class="ti r">● CRIT — SITE 3 LINK DOWN</span><span class="ti a">● WARN — COOLING MCR BAY C 28°C</span>
+        <span class="ti g">● RESOLVED — DVN FEED 2 RESTORED</span><span class="ti">● INFO — ENCODER REBOOT 22:00</span>
+        <span class="ti a">● WARN — UPS BATTERY 67%</span><span class="ti g">● OK — DAB+ MUXES NOMINAL</span>
+        <span class="ti r">● CRIT — TX-01 CARRIER LOSS 95.3FM</span><span class="ti a">● WARN — AUDIO LOW STUDIO B</span>
+        <span class="ti r">● CRIT — SITE 3 LINK DOWN</span><span class="ti a">● WARN — COOLING MCR BAY C 28°C</span>
+        <span class="ti g">● RESOLVED — DVN FEED 2 RESTORED</span><span class="ti">● INFO — ENCODER REBOOT 22:00</span>
+        <span class="ti a">● WARN — UPS BATTERY 67%</span><span class="ti g">● OK — DAB+ MUXES NOMINAL</span>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- ══ CISCO PHONE ══ -->
+  <div class="drag-item" id="phone-item">
+    <div class="drag-handle">
+      <div class="grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <span class="dh-label">CISCO IP 8861</span>
+    </div>
+    <div class="cisco-phone">
+      <div class="ph-cradle">
+        <div class="ph-recv-top"></div>
+        <div class="ph-recv-stem"></div>
+        <div class="ph-cord"></div>
+        <div class="ph-recv-bot"></div>
+      </div>
+      <div class="ph-main">
+        <div class="ph-brand-strip">
+          <div class="ph-brand-name">CISCO</div>
+          <div class="ph-model">IP PHONE 8861</div>
+        </div>
+        <div class="ph-top">
+          <div class="ph-screen">
+            <div class="ph-screen-time" id="ph-time">09:22</div>
+            <div class="ph-screen-line">Ext. 2401</div>
+            <div class="ph-screen-ext">Available</div>
+          </div>
+          <div class="ph-lines">
+            <div class="ph-line-btn"><div class="ph-line-led on-r"></div><div class="ph-line-lbl">1</div></div>
+            <div class="ph-line-btn"><div class="ph-line-led on-a"></div><div class="ph-line-lbl">2</div></div>
+            <div class="ph-line-btn"><div class="ph-line-led on-g"></div><div class="ph-line-lbl">3</div></div>
+            <div class="ph-line-btn"><div class="ph-line-led"></div><div class="ph-line-lbl">4</div></div>
+          </div>
+        </div>
+        <div class="ph-softkeys">
+          <div class="ph-sk">Hold</div><div class="ph-sk">Trnsf</div>
+          <div class="ph-sk">Conf</div><div class="ph-sk">More</div>
+        </div>
+        <div class="ph-nav-row">
+          <div class="ph-nav">
+            <div class="ph-nav-ring">
+              <div class="ph-nav-arrow ph-nav-up">▲</div>
+              <div class="ph-nav-arrow ph-nav-down">▼</div>
+              <div class="ph-nav-arrow ph-nav-left">◀</div>
+              <div class="ph-nav-arrow ph-nav-right">▶</div>
+              <div class="ph-nav-center">OK</div>
+            </div>
+          </div>
+          <div class="ph-func">
+            <div class="ph-fb green-btn">▶ Ans</div>
+            <div class="ph-fb red-btn">▪ End</div>
+            <div class="ph-fb">✉ Msg</div>
+            <div class="ph-fb">☰ Dir</div>
+            <div class="ph-fb">⚙ Set</div>
+            <div class="ph-fb">🎧 Hdst</div>
+          </div>
+        </div>
+        <div class="ph-dialpad">
+          <div class="ph-dk">1</div><div class="ph-dk">2</div><div class="ph-dk">3</div>
+          <div class="ph-dk">4</div><div class="ph-dk">5</div><div class="ph-dk">6</div>
+          <div class="ph-dk">7</div><div class="ph-dk">8</div><div class="ph-dk">9</div>
+          <div class="ph-dk">✱</div><div class="ph-dk">0</div><div class="ph-dk">#</div>
+        </div>
+      </div>
+    </div>
+    <div class="ph-base"></div>
+  </div>
+
+  <!-- ══ MONITOR 1: EMAIL ══ -->
+  <div class="drag-item" id="mon1-item">
+    <div class="drag-handle">
+      <div class="grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <span class="dh-label">PC 1 — EMAIL</span>
+      <span class="dh-hint">drag · resize corner</span>
+    </div>
+    <div class="mon-bezel">
+      <div class="mon-urlbar">
+        <div class="mon-urlbar-label">PC 1</div>
+        <input class="mon-urlbar-input" id="url1" type="text" placeholder="Enter URL…" spellcheck="false" />
+        <div class="mon-urlbar-go" onclick="loadUrl(1)">GO ▶</div>
+      </div>
+      <div class="mon-iframe-wrap" style="flex:1;">
+        <iframe class="mon-iframe" id="frame1" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+        <div class="mon-blocked" id="blocked1">
+          <div class="mon-blocked-icon">⊘</div>
+          <div class="mon-blocked-msg">Site blocked iframe embedding.</div>
+          <div class="mon-blocked-hint">Try: wikipedia.org · openstreetmap.org<br>bbc.com/news · weather.com</div>
+        </div>
+      </div>
+    </div>
+    <div class="mon-stand"><div class="mon-neck"></div><div class="mon-base"></div></div>
+  </div>
+
+  <!-- ══ MONITOR 2: TICKETING ══ -->
+  <div class="drag-item" id="mon2-item">
+    <div class="drag-handle">
+      <div class="grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <span class="dh-label">PC 2 — TICKETING</span>
+      <span class="dh-hint">drag · resize corner</span>
+    </div>
+    <div class="mon-bezel" style="width:280px;">
+      <div class="mon-urlbar">
+        <div class="mon-urlbar-label">PC 2</div>
+        <input class="mon-urlbar-input" id="url2" type="text" placeholder="Enter URL…" spellcheck="false" />
+        <div class="mon-urlbar-go" onclick="loadUrl(2)">GO ▶</div>
+      </div>
+      <div class="mon-iframe-wrap" style="flex:1;">
+        <iframe class="mon-iframe" id="frame2" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+        <div class="mon-blocked" id="blocked2">
+          <div class="mon-blocked-icon">⊘</div>
+          <div class="mon-blocked-msg">Site blocked iframe embedding.</div>
+          <div class="mon-blocked-hint">Try: wikipedia.org · openstreetmap.org<br>bbc.com/news · weather.com</div>
+        </div>
+      </div>
+    </div>
+    <div class="mon-stand"><div class="mon-neck"></div><div class="mon-base"></div></div>
+  </div>
+
+  <!-- ══ MONITOR 3: REMOTE DESKTOP ══ -->
+  <div class="drag-item" id="mon3-item">
+    <div class="drag-handle">
+      <div class="grip"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <span class="dh-label">PC 3 — REMOTE DESKTOP</span>
+      <span class="dh-hint">drag · resize corner</span>
+    </div>
+    <div class="mon-bezel">
+      <div class="mon-urlbar">
+        <div class="mon-urlbar-label">PC 3</div>
+        <input class="mon-urlbar-input" id="url3" type="text" placeholder="Enter URL…" spellcheck="false" />
+        <div class="mon-urlbar-go" onclick="loadUrl(3)">GO ▶</div>
+      </div>
+      <div class="mon-iframe-wrap" style="flex:1;">
+        <iframe class="mon-iframe" id="frame3" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+        <div class="mon-blocked" id="blocked3">
+          <div class="mon-blocked-icon">⊘</div>
+          <div class="mon-blocked-msg">Site blocked iframe embedding.</div>
+          <div class="mon-blocked-hint">Try: wikipedia.org · openstreetmap.org<br>bbc.com/news · weather.com</div>
+        </div>
+      </div>
+    </div>
+    <div class="mon-stand"><div class="mon-neck"></div><div class="mon-base"></div></div>
+  </div>
+
+</div><!-- /stage -->
+
+<!-- DESK SURFACE (sits at bottom of stage) -->
+<div id="desk-surface">
+  <div class="desk-top"></div>
+  <div class="desk-front"></div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <span>OPERATOR: <span>T. MORRISON</span></span>
+  <span>STATION: <span>PRIMARY MCR — BRISBANE HQ</span></span>
+  <span>INCIDENTS: <span>7 ACTIVE</span></span>
+  <span>SESSION: <span>ACTIVE</span></span>
+</div>
+
+<script>
+// ━━ CLOCK ━━
+function updateClock(){
+  const n=new Date(),p=v=>String(v).padStart(2,'0');
+  document.getElementById('clock').textContent=`${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
+  document.getElementById('ph-time').textContent=`${p(n.getHours())}:${p(n.getMinutes())}`;
+}
+updateClock(); setInterval(updateClock,1000);
+
+// ━━ INITIAL POSITIONS ━━
+function setInitialPositions(){
+  const W=window.innerWidth, H=window.innerHeight;
+  const topH=28, botH=26, stageH=H-topH-botH;
+  const DESK_H=82;           // desk surface height
+  const deskTop=stageH-DESK_H; // Y of desk top surface in stage coords
+
+  // Wall display: top of stage
+  pos('wall-item', Math.round(W*0.03), 6);
+  document.getElementById('wall-item').style.width=(Math.round(W*0.94))+'px';
+
+  // Monitors: position so their base (bottom of drag-item) sits on desk surface.
+  // Estimated drag-item height = handle(22) + bezel(200) + neck(41) + base(16) = ~279
+  const monDefaultH = 279;
+  const monTop = deskTop - monDefaultH;
+
+  pos('phone-item',  18,                        deskTop - 310);
+  pos('mon1-item',   Math.round(W*0.17),         monTop + 4);
+  pos('mon2-item',   Math.round(W*0.5 - 140),   monTop);
+  pos('mon3-item',   Math.round(W*0.72),         monTop + 4);
+}
+
+function pos(id,x,y){
+  const el=document.getElementById(id);
+  el.style.left=x+'px'; el.style.top=y+'px';
+}
+
+setInitialPositions();
+
+// ━━ DRAG ━━
+let dragEl=null, dragOX=0, dragOY=0;
+
+document.querySelectorAll('.drag-handle').forEach(handle=>{
+  handle.addEventListener('mousedown',e=>{
+    // Don't drag when clicking inputs/buttons
+    if(e.target.tagName==='INPUT'||e.target.tagName==='BUTTON'||e.target.classList.contains('mon-urlbar-go')) return;
+    e.preventDefault();
+    dragEl=handle.closest('.drag-item');
+    dragEl.classList.add('active');
+    // Bring to front
+    let maxZ=0;
+    document.querySelectorAll('.drag-item').forEach(d=>{ maxZ=Math.max(maxZ,parseInt(d.style.zIndex)||10); });
+    dragEl.style.zIndex=maxZ+1;
+
+    const rect=dragEl.getBoundingClientRect();
+    dragOX=e.clientX-rect.left;
+    dragOY=e.clientY-rect.top;
+  });
+});
+
+document.addEventListener('mousemove',e=>{
+  if(!dragEl) return;
+  const stage=document.getElementById('stage');
+  const sr=stage.getBoundingClientRect();
+  let x=e.clientX-sr.left-dragOX;
+  let y=e.clientY-sr.top-dragOY;
+  // Soft-clamp so at least the drag handle stays visible
+  x=Math.max(-dragEl.offsetWidth+40, Math.min(stage.offsetWidth-40, x));
+  y=Math.max(0, Math.min(stage.offsetHeight-20, y));
+  dragEl.style.left=x+'px';
+  dragEl.style.top=y+'px';
+});
+
+document.addEventListener('mouseup',()=>{
+  if(dragEl){ dragEl.classList.remove('active'); dragEl=null; }
+});
+
+// Touch support
+document.querySelectorAll('.drag-handle').forEach(handle=>{
+  handle.addEventListener('touchstart',e=>{
+    if(e.target.tagName==='INPUT') return;
+    const t=e.touches[0];
+    dragEl=handle.closest('.drag-item');
+    dragEl.classList.add('active');
+    const rect=dragEl.getBoundingClientRect();
+    dragOX=t.clientX-rect.left; dragOY=t.clientY-rect.top;
+  },{passive:true});
+});
+document.addEventListener('touchmove',e=>{
+  if(!dragEl) return;
+  const t=e.touches[0];
+  const stage=document.getElementById('stage');
+  const sr=stage.getBoundingClientRect();
+  dragEl.style.left=(t.clientX-sr.left-dragOX)+'px';
+  dragEl.style.top=(t.clientY-sr.top-dragOY)+'px';
+},{passive:true});
+document.addEventListener('touchend',()=>{ if(dragEl){dragEl.classList.remove('active');dragEl=null;} });
+
+// ━━ URL LOADER ━━
+function loadUrl(num){
+  const input=document.getElementById('url'+num);
+  const frame=document.getElementById('frame'+num);
+  const blocked=document.getElementById('blocked'+num);
+  let url=input.value.trim();
+  if(!url) return;
+  if(!/^https?:\/\//i.test(url)) url='https://'+url;
+  input.value=url;
+  blocked.classList.remove('visible');
+  frame.style.display='block';
+  frame.src=url;
+  frame.onload=function(){
+    try{
+      const doc=frame.contentDocument||frame.contentWindow.document;
+      if(!doc||!doc.body||doc.body.innerHTML==='') showBlocked(num);
+    }catch(e){}
+  };
+  frame.onerror=()=>showBlocked(num);
+}
+function showBlocked(num){
+  document.getElementById('frame'+num).style.display='none';
+  document.getElementById('blocked'+num).classList.add('visible');
+}
+[1,2,3].forEach(n=>{
+  document.getElementById('url'+n).addEventListener('keydown',e=>{ if(e.key==='Enter') loadUrl(n); });
+});
+
+// ━━ GLOBE ━━
+const canvas=document.getElementById('globe');
+const ctx=canvas.getContext('2d');
+let rot=0;
+function resizeGlobe(){
+  const w=canvas.parentElement;
+  canvas.width=w.clientWidth; canvas.height=w.clientHeight;
+}
+resizeGlobe();
+window.addEventListener('resize',()=>{ resizeGlobe(); setInitialPositions(); });
+
+const nodes=[
+  {name:'BNE',lat:-27.5,lon:153.0,fault:false},{name:'SYD',lat:-33.9,lon:151.2,fault:false},
+  {name:'MEL',lat:-37.8,lon:145.0,fault:false},{name:'PER',lat:-31.9,lon:115.9,fault:true},
+  {name:'ADL',lat:-34.9,lon:138.6,fault:false},{name:'TSV',lat:-19.3,lon:146.8,fault:false},
+  {name:'DAR',lat:-12.5,lon:130.8,fault:true},{name:'CBR',lat:-35.3,lon:149.1,fault:false},
+];
+const links=[[0,1],[1,2],[0,2],[2,3],[2,4],[0,5],[0,6],[0,7],[1,7],[3,4]];
+function proj(lat,lon,cx,cy,r){
+  const la=lat*Math.PI/180,lo=(lon+rot)*Math.PI/180;
+  return{x:cx+r*Math.cos(la)*Math.sin(lo),y:cy-r*Math.sin(la),d:Math.cos(la)*Math.cos(lo)};
+}
+function draw(){
+  const W=canvas.width,H=canvas.height;
+  if(!W||!H){requestAnimationFrame(draw);return;}
+  const cx=W/2,cy=H/2+4,r=Math.min(W,H)*0.4;
+  ctx.clearRect(0,0,W,H);
+  const g=ctx.createRadialGradient(cx-r*.25,cy-r*.25,r*.05,cx,cy,r);
+  g.addColorStop(0,'rgba(0,45,110,0.55)');g.addColorStop(.6,'rgba(0,20,60,0.35)');g.addColorStop(1,'rgba(0,4,18,0.2)');
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
+  ctx.strokeStyle='rgba(0,90,200,0.28)';ctx.lineWidth=1;ctx.stroke();
+  [-60,-30,0,30,60].forEach(lat=>{
+    ctx.beginPath();let f=true;
+    for(let lo=-180;lo<=180;lo+=4){const p=proj(lat,lo,cx,cy,r);if(p.d<0){f=true;continue;}f?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y);f=false;}
+    ctx.strokeStyle='rgba(0,70,160,0.16)';ctx.lineWidth=0.5;ctx.stroke();
+  });
+  for(let lo=0;lo<360;lo+=30){
+    ctx.beginPath();let f=true;
+    for(let lat=-90;lat<=90;lat+=4){const p=proj(lat,lo,cx,cy,r);if(p.d<0){f=true;continue;}f?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y);f=false;}
+    ctx.strokeStyle='rgba(0,70,160,0.12)';ctx.lineWidth=0.5;ctx.stroke();
+  }
+  links.forEach(([ai,bi])=>{
+    const a=nodes[ai],b=nodes[bi],pa=proj(a.lat,a.lon,cx,cy,r),pb=proj(b.lat,b.lon,cx,cy,r);
+    if(pa.d<0||pb.d<0)return;
+    const fault=a.fault||b.fault;
+    ctx.beginPath();ctx.moveTo(pa.x,pa.y);ctx.lineTo(pb.x,pb.y);
+    ctx.strokeStyle=fault?`rgba(255,51,85,${.25+.25*Math.sin(Date.now()/350)})`:'rgba(0,184,255,0.2)';
+    ctx.lineWidth=fault?1:.7;ctx.setLineDash(fault?[3,3]:[]);ctx.stroke();ctx.setLineDash([]);
+  });
+  nodes.forEach((n,i)=>{
+    const p=proj(n.lat,n.lon,cx,cy,r);
+    if(p.d<-.1)return;
+    const col=n.fault?'#ff3355':'#00ffaa',pulse=.5+.5*Math.sin(Date.now()/600+i*1.2);
+    ctx.beginPath();ctx.arc(p.x,p.y,4+pulse*2.5,0,Math.PI*2);
+    ctx.strokeStyle=n.fault?`rgba(255,51,85,${.15*pulse})`:`rgba(0,255,170,${.12*pulse})`;
+    ctx.lineWidth=1;ctx.stroke();
+    ctx.beginPath();ctx.arc(p.x,p.y,2.2,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();
+    if(p.d>.15){ctx.fillStyle=n.fault?'rgba(255,51,85,.85)':'rgba(0,255,170,.75)';ctx.font='6.5px Share Tech Mono';ctx.fillText(n.name,p.x+4,p.y-2);}
+  });
+  rot+=.12;requestAnimationFrame(draw);
+}
+draw();
+</script>
+</body>
+</html>
